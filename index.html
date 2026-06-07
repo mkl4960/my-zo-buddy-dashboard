@@ -17,20 +17,22 @@
     </div>
     <script>
         // Load restarts.json and update dashboard
-        fetch('/restarts.json')
+        fetch('restarts.json')
             .then(response => response.json())
             .then(data => {
                 // Update last checked timestamp
-                document.getElementById('lastChecked').textContent =
-                    data.last_checked || 'Never'</p>
-
+                document.getElementById('lastChecked').textContent = data.last_checked || 'Never';
                 // Display restart events
-                const restartsList = document.getElementById('restartsList');
-                data.restarts.forEach(timestamp => {
+                const list = document.getElementById('restartsList');
+                (data.restarts || []).forEach(ts => {
                     const li = document.createElement('li');
-                    li.textContent = new Date(timestamp).toLocaleString();
-                    restartsList.appendChild(li);
+                    li.textContent = new Date(ts).toLocaleString();
+                    list.appendChild(li);
                 });
+            })
+            .catch(err => {
+                document.getElementById('lastChecked').textContent = 'Error loading data';
+                console.error(err);
             });
     </script>
 </body>
