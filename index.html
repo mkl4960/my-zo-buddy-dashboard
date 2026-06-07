@@ -153,7 +153,7 @@ function getISOWeek(date) {
   return Math.ceil(((d - yearStart) / 86400000 + 1)/7);
 }
 function exportCSV() {
-  fetch('restarts.json')
+  fetch('/my-zo-buddy-dashboard/restarts.json')
     .then(r=>r.json())
     .then(data=> {
       const csv = ['timestamp', ...(data.restarts||[])].join('\n');
@@ -164,14 +164,14 @@ function exportCSV() {
     .catch(err=>{console.error('CSV export error',err);});
 }
 function exportPDF() {
-  fetch('restarts.json')
+  fetch('/my-zo-buddy-dashboard/restarts.json')
     .then(r=>r.json())
     .then(data=> {
       const {jsPDF}=window.jspdf;
       const doc=new jsPDF();
       doc.text('Zo-Computer Restart Report',10,10);
-      doc.text(`Last Checked: ${etFormat(data.last_checked)}`,10,20);
-      doc.text(`Total Restarts: ${data.restarts?.length||0}`,10,30);
+      doc.text(`Last Checked: ${etFormat(data.last_checked)}',10,20);
+      doc.text(`Total Restarts: ${data.restarts?.length||0}',10,30);
       let y=40;
       (data.restarts||[]).forEach(ts=>{doc.text(etFormat(ts),10,y);y+=10;if(y>280){doc.addPage();y=20;}});
       doc.save('restarts.pdf');
@@ -209,7 +209,21 @@ function updateDashboard(data) {
     const restartLabels = dates.map(d=>etDateOnly(d));
     const restartCtx = document.getElementById('restartChart').getContext('2d');
     if(window.restartChart) window.restartChart.destroy();
-    window.restartChart = new Chart(restartCtx,{type:'line',data:{labels:restartLabels,datasets:[{label:'Restarts per Day (ET)',data:restartCounts,borderColor:'#3498db',backgroundColor:'rgba(52,152,219,0.1)',tension:0.1,fill:true}]},options:{responsive:true,scales:{y:{beginAtZero:true},x:{title:{display:true,text:'Date (ET)'}},y:{title:{display:true,text:'Count'}}},plugins:{legend:{display:true},tooltip:{mode:'index',intersect:false}}}});
+    window.restartChart = new Chart(restartCtx,{{
+      type:'line',
+      data:{labels:restartLabels,datasets:[{
+        label:'Restarts per Day (ET)',
+        data:restartCounts,
+        borderColor:'#3498db',
+        backgroundColor:'rgba(52,152,219,0.1)',
+        tension:0.1,
+        fill:true
+      }]},
+      options:{responsive:true,
+        scales:{y:{beginAtZero:true},x:{title:{display:true,text:'Date (ET)'}},y:{title:{display:true,text:'Count'}}},
+        plugins:{legend:{display:true},tooltip:{mode:'index',intersect:false}}
+      }
+    });
 
     // Uptime accumulation chart
     const timestamps = restarts.slice().sort();
@@ -232,24 +246,42 @@ function updateDashboard(data) {
     const uptimeData = points.map(p=>p.uptimeHours.toFixed(2));
     const uptimeCtx = document.getElementById('uptimeChart').getContext('2d');
     if(window.uptimeChart) window.uptimeChart.destroy();
-    window.uptimeChart = new Chart(uptimeCtx,{type:'line',data:{labels:uptimeLabels,datasets:[{label:'Cumulative Uptime (hours, ET)',data:uptimeData,borderColor:'#ffb74d',backgroundColor:'rgba(255,183,77,0.1)',tension:0.1,fill:true}]},options:{responsive:true,scales:{y:{beginAtZero:true},x:{title:{display:true,text:'Date (ET)'}},y:{title:{display:true,text:'Uptime (hours)'}}},plugins:{legend:{display:true},tooltip:{mode:'index',intersect:false}}}});
+    window.uptimeChart = new Chart(uptimeCtx,{{
+      type:'line',
+      data:{labels:uptimeLabels,datasets:[{
+        label:'Cumulative Uptime (hours, ET)',
+        data:uptimeData,
+        borderColor:'#ffb74d',
+        backgroundColor:'rgba(255,183,77,0.1)',
+        tension:0.1,
+        fill:true
+      }]},
+      options:{responsive:true,
+        scales:{y:{beginAtZero:true},x:{title:{display:true,text:'Date (ET)'}},y:{title:{display:true,text:'Uptime (hours)'}}},
+        plugins:{legend:{display:true},tooltip:{mode:'index',intersect:false}}
+      }
+    });
 
     // Restart list
     const list=document.getElementById('restartsList');
     list.innerHTML='';
-    restarts.forEach(ts=>{const li=document.createElement('li');li.textContent=etFormat(ts);list.appendChild(li);});
+    restarts.forEach(ts=>{
+      const li=document.createElement('li');
+      li.textContent=etFormat(ts);
+      list.appendChild(li);
+    });
   } catch (e) {
     console.error('Dashboard update error', e);
     document.getElementById('lastChecked').textContent = 'Error processing data';
   }
 }
 // Initial load
-fetch('restarts.json')
+fetch('/my-zo-buddy-dashboard/restarts.json')
   .then(r=>{console.log('Fetch response:', r); return r.json();})
   .then(data=>{console.log('Parsed data:', data); updateDashboard(data);})
   .catch(err=>{console.error('Fetch error',err); document.getElementById('lastChecked').textContent='Error loading data';});
 // Poll every 5 minutes
-setInterval(()=>{fetch('restarts.json')
+setInterval(()=>{fetch('/my-zo-buddy-dashboard/restarts.json')
   .then(r=>r.json())
   .then(updateDashboard)
   .catch(err=>{console.error('Polling error',err); document.getElementById('lastChecked').textContent='Error loading data';});},300000);
