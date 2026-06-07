@@ -87,9 +87,7 @@ h1 { color: var(--text-accent); margin-top: 0; }
   cursor: pointer;
 }
 
-.export-buttons button:hover {
-  opacity: 0.9;
-}
+.export-buttons button:hover { opacity: 0.9; }
 
 @media (max-width: 600px) {
   body { padding: 10px; }
@@ -104,22 +102,10 @@ h1 { color: var(--text-accent); margin-top: 0; }
 <div class="stats">
   <p><strong>Last Checked:</strong> <span id="lastChecked">Loading...</span></p>
   <div class="counters">
-    <div class="counter">
-      <h3>Total Restarts</h3>
-      <p id="totalRestarts">0</p>
-    </div>
-    <div class="counter">
-      <h3>Today</h3>
-      <p id="todayRestarts">0</p>
-    </div>
-    <div class="counter">
-      <h3>This Week</h3>
-      <p id="weekRestarts">0</p>
-    </div>
-    <div class="counter">
-      <h3>This Month</h3>
-      <p id="monthRestarts">0</p>
-    </div>
+    <div class="counter"><h3>Total Restarts</h3><p id="totalRestarts">0</p></div>
+    <div class="counter"><h3>Today</h3><p id="todayRestarts">0</p></div>
+    <div class="counter"><h3>This Week</h3><p id="weekRestarts">0</p></div>
+    <div class="counter"><h3>This Month</h3><p id="monthRestarts">0</p></div>
   </div>
   <div class="export-buttons">
     <button onclick="exportCSV()">Export CSV</button>
@@ -132,180 +118,120 @@ h1 { color: var(--text-accent); margin-top: 0; }
 <div class="chart-container">
   <canvas id="restartChart"></canvas>
 </div>
+<div class="chart-container">
+  <canvas id="uptimeChart"></canvas>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script>
 function etFormat(dateStr) {
-  const options = { 
-    timeZone: 'America/New_York',
-    year: 'numeric', 
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  };
+  const options = { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false };
   return new Date(dateStr).toLocaleString('en-US', options);
 }
-
 function etDateOnly(dateStr) {
-  const options = { 
-    timeZone: 'America/New_York',
-    year: 'numeric', 
-    month: '2-digit',
-    day: '2-digit'
-  };
+  const options = { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' };
   return new Date(dateStr).toLocaleString('en-CA', options);
 }
-
 function getISOWeek(date) {
   const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() + 4 - (d.getDay() || 7));
-  const yearStart = new Date(d.getFullYear(), 0, 1);
-  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  d.setHours(0,0,0,0);
+  d.setDate(d.getDate() + 4 - (d.getDay()||7));
+  const yearStart = new Date(d.getFullYear(),0,1);
+  return Math.ceil(((d - yearStart) / 86400000 + 1)/7);
 }
-
-function updateDashboard(data) {
-  const lastChecked = data.last_checked || 'Never';
-  document.getElementById('lastChecked').textContent = etFormat(lastChecked);
-
-  const restarts = data.restarts || [];
-  const totalRestarts = restarts.length;
-  document.getElementById('totalRestarts').textContent = totalRestarts;
-
-  const dayCounts = {};
-  const weekCounts = {};
-  const monthCounts = {};
-
-  const now = new Date();
-  const todayStr = etDateOnly(now.toISOString());
-  const thisWeek = `${now.getFullYear()}-W${getISOWeek(now)}`;
-  const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-
-  restarts.forEach(ts => {
-    const etDate = etDateOnly(ts);
-    dayCounts[etDate] = (dayCounts[etDate] || 0) + 1;
-
-    const d = new Date(ts);
-    const weekKey = `${d.getFullYear()}-W${getISOWeek(d)}`;
-    weekCounts[weekKey] = (weekCounts[weekKey] || 0) + 1;
-
-    const monthKey = ts.substring(0, 7);
-    monthCounts[monthKey] = (monthCounts[monthKey] || 0) + 1;
-  });
-
-  document.getElementById('todayRestarts').textContent = dayCounts[todayStr] || 0;
-  document.getElementById('weekRestarts').textContent = weekCounts[thisWeek] || 0;
-  document.getElementById('monthRestarts').textContent = monthCounts[thisMonth] || 0;
-
-  const dates = Object.keys(dayCounts).sort();
-  const counts = dates.map(d => dayCounts[d]);
-  const etLabels = dates.map(d => etDateOnly(d));
-
-  const ctx = document.getElementById('restartChart').getContext('2d');
-  if (window.chartInstance) window.chartInstance.destroy();
-  window.chartInstance = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: etLabels,
-      datasets: [{
-        label: 'Restarts per Day (ET)',
-        data: counts,
-        borderColor: '#3498db',
-        backgroundColor: 'rgba(52,152,219,0.1)',
-        tension: 0.1,
-        fill: true,
-      }]
-    },
-    options: {
-      responsive: true,
-      scales: {
-        y: { beginAtZero: true },
-        x: { title: { display: true, text: 'Date (ET)' } },
-        y: { title: { display: true, text: 'Count' } }
-      },
-      plugins: {
-        legend: { display: true },
-        tooltip: { mode: 'index', intersect: false }
-      }
-    }
-  });
-
-  const list = document.getElementById('restartsList');
-  list.innerHTML = '';
-  restarts.forEach(ts => {
-    const li = document.createElement('li');
-    li.textContent = etFormat(ts);
-    list.appendChild(li);
-  });
-}
-
 function exportCSV() {
   fetch('restarts.json')
-    .then(r => r.json())
-    .then(data => {
-      const csv = ['timestamp', ...(data.restarts || [])].join('\n');
-      const blob = new Blob([csv], { type: 'text/csv' });
+    .then(r=>r.json())
+    .then(data=>{
+      const csv = ['timestamp', ...(data.restarts||[])].join('\n');
+      const blob = new Blob([csv],{type:'text/csv'});
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'restarts.csv';
-      a.click();
-      URL.revokeObjectURL(url);
+      const a=document.createElement('a');a.href=url;a.download='restarts.csv';a.click();URL.revokeObjectURL(url);
     });
 }
-
 function exportPDF() {
   fetch('restarts.json')
-    .then(r => r.json())
-    .then(data => {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
-      doc.text('Zo-Computer Restart Report', 10, 10);
-      doc.text(`Last Checked: ${etFormat(data.last_checked)}`, 10, 20);
-      doc.text(`Total Restarts: ${data.restarts?.length || 0}`, 10, 30);
-      let y = 40;
-      (data.restarts || []).forEach(ts => {
-        doc.text(etFormat(ts), 10, y);
-        y += 10;
-        if (y > 280) { doc.addPage(); y = 20; }
-      });
+    .then(r=>r.json())
+    .then(data=>{
+      const {jsPDF}=window.jspdf;
+      const doc=new jsPDF();
+      doc.text('Zo-Computer Restart Report',10,10);
+      doc.text(`Last Checked: ${etFormat(data.last_checked)}`,10,20);
+      doc.text(`Total Restarts: ${data.restarts?.length||0}`,10,30);
+      let y=40;
+      (data.restarts||[]).forEach(ts=>{doc.text(etFormat(ts),10,y);y+=10;if(y>280){doc.addPage();y=20;}});
       doc.save('restarts.pdf');
     });
 }
+function updateDashboard(data) {
+  document.getElementById('lastChecked').textContent = etFormat(data.last_checked||'');
+  const restarts = data.restarts||[];
+  document.getElementById('totalRestarts').textContent = restarts.length;
 
-// Initial load
-fetch('restarts.json')
-  .then(r => r.json())
-  .then(updateDashboard)
-  .catch(err => {
-    document.getElementById('lastChecked').textContent = 'Error loading data';
-    console.error(err);
+  const dayCounts={}, weekCounts={}, monthCounts={};
+  const now = new Date();
+  const todayStr = etDateOnly(now.toISOString());
+  const thisWeek = `${now.getFullYear()}-W${getISOWeek(now)}`;
+  const thisMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+
+  restarts.forEach(ts=>{
+    const day = etDateOnly(ts);
+    dayCounts[day]=(dayCounts[day]||0)+1;
+    const weekKey = `${new Date(ts).getFullYear()}-W${getISOWeek(ts)}`;
+    weekCounts[weekKey]=(weekCounts[weekKey]||0)+1;
+    const monthKey = ts.substring(0,7);
+    monthCounts[monthKey]=(monthCounts[monthKey]||0)+1;
   });
+  document.getElementById('todayRestarts').textContent = dayCounts[todayStr]||0;
+  document.getElementById('weekRestarts').textContent = weekCounts[thisWeek]||0;
+  document.getElementById('monthRestarts').textContent = monthCounts[thisMonth]||0;
 
-// WebSocket for real-time updates (fallback to polling)
-const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-const wsUrl = `${protocol}://localhost:8080/ws`;
-let ws;
+  // Restart chart data
+  const dates = Object.keys(dayCounts).sort();
+  const restartCounts = dates.map(d=>dayCounts[d]);
+  const restartLabels = dates.map(d=>etDateOnly(d));
+  const restartCtx = document.getElementById('restartChart').getContext('2d');
+  if(window.restartChart) window.restartChart.destroy();
+  window.restartChart = new Chart(restartCtx,{type:'line',data:{labels:restartLabels,datasets:[{label:'Restarts per Day (ET)',data:restartCounts,borderColor:'#3498db',backgroundColor:'rgba(52,152,219,0.1)',tension:0.1,fill:true}]},options:{responsive:true,scales:{y:{beginAtZero:true},x:{title:{display:true,text:'Date (ET)'}},y:{title:{display:true,text:'Count'}}},plugins:{legend:{display:true},tooltip:{mode:'index',intersect:false}}}});
 
-function connectWebSocket() {
-  ws = new WebSocket(wsUrl);
-  ws.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-    updateDashboard(data);
-  };
-  ws.onclose = () => setTimeout(connectWebSocket, 5000);
+  // Uptime accumulation chart
+  // Compute cumulative uptime (in hours) between restarts up to last_checked
+  const timestamps = restarts.slice().sort(); // ISO strings
+  const lastChecked = data.last_checked ? new Date(data.last_checked) : new Date();
+  const points = [];
+  let cumulativeMs = 0;
+  let prev = timestamps.length ? new Date(timestamps[0]) : lastChecked; // start from first restart or now
+  // If there are restarts, assume system was down at each restart moment, uptime starts after that moment
+  timestamps.forEach(ts=>{
+    const cur = new Date(ts);
+    // uptime from prev (after previous restart) to this restart
+    const diff = cur - prev; // ms
+    if(diff>0) cumulativeMs += diff;
+    points.push({time: cur, uptimeHours: cumulativeMs/3600000});
+    // after restart, reset uptime counter (system down), set prev to cur (restart moment)
+    prev = cur;
+  });
+  // Add final segment up to lastChecked
+  const finalDiff = lastChecked - prev;
+  if(finalDiff>0) cumulativeMs += finalDiff;
+  points.push({time: lastChecked, uptimeHours: cumulativeMs/3600000});
+
+  const uptimeLabels = points.map(p=>etDateOnly(p.time.toISOString()));
+  const uptimeData = points.map(p=>p.uptimeHours.toFixed(2));
+  const uptimeCtx = document.getElementById('uptimeChart').getContext('2d');
+  if(window.uptimeChart) window.uptimeChart.destroy();
+  window.uptimeChart = new Chart(uptimeCtx,{type:'line',data:{labels:uptimeLabels,datasets:[{label:'Cumulative Uptime (hours, ET)',data:uptimeData,borderColor:'#ffb74d',backgroundColor:'rgba(255,183,77,0.1)',tension:0.1,fill:true}]},options:{responsive:true,scales:{y:{beginAtZero:true},x:{title:{display:true,text:'Date (ET)'}},y:{title:{display:true,text:'Uptime (hours)'}}},plugins:{legend:{display:true},tooltip:{mode:'index',intersect:false}}}});
+
+  // Restart list
+  const list=document.getElementById('restartsList');
+  list.innerHTML='';
+  restarts.forEach(ts=>{const li=document.createElement('li');li.textContent=etFormat(ts);list.appendChild(li);});
 }
-
+// Initial load
+fetch('restarts.json').then(r=>r.json()).then(updateDashboard).catch(err=>{document.getElementById('lastChecked').textContent='Error loading data';console.error(err);});
 // Fallback polling every 5 minutes
-setInterval(() => {
-  fetch('restarts.json')
-    .then(r => r.json())
-    .then(updateDashboard)
-    .catch(console.error);
-}, 300000);
+setInterval(()=>{fetch('restarts.json').then(r=>r.json()).then(updateDashboard).catch(console.error);},300000);
 </script>
 </body>
 </html>
