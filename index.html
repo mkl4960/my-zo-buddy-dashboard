@@ -126,12 +126,24 @@ h1 { color: var(--text-accent); margin-top: 0; }
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script>
 function etFormat(dateStr) {
-  const options = { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false };
-  return new Date(dateStr).toLocaleString('en-US', options);
+  if (!dateStr) return 'Never';
+  try {
+    const options = { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false };
+    return new Date(dateStr).toLocaleString('en-US', options);
+  } catch (e) {
+    console.error('Invalid date string:', dateStr, e);
+    return dateStr;
+  }
 }
 function etDateOnly(dateStr) {
-  const options = { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' };
-  return new Date(dateStr).toLocaleString('en-CA', options);
+  if (!dateStr) return '';
+  try {
+    const options = { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' };
+    return new Date(dateStr).toLocaleString('en-CA', options);
+  } catch (e) {
+    console.error('Invalid date string:', dateStr, e);
+    return dateStr;
+  }
 }
 function getISOWeek(date) {
   const d = new Date(date);
@@ -168,8 +180,9 @@ function exportPDF() {
 }
 function updateDashboard(data) {
   try {
-    document.getElementById('lastChecked').textContent = etFormat(data.last_checked||'');
-    const restarts = data.restarts||[];
+    console.log('Dashboard update data:', data);
+    document.getElementById('lastChecked').textContent = etFormat(data.last_checked);
+    const restarts = Array.isArray(data.restarts) ? data.restarts : [];
     document.getElementById('totalRestarts').textContent = restarts.length;
 
     const dayCounts={}, weekCounts={}, monthCounts={};
@@ -232,11 +245,14 @@ function updateDashboard(data) {
 }
 // Initial load
 fetch('restarts.json')
-  .then(r=>r.json())
-  .then(updateDashboard)
+  .then(r=>{console.log('Fetch response:', r); return r.json();})
+  .then(data=>{console.log('Parsed data:', data); updateDashboard(data);})
   .catch(err=>{console.error('Fetch error',err); document.getElementById('lastChecked').textContent='Error loading data';});
 // Poll every 5 minutes
-setInterval(()=>{fetch('restarts.json').then(r=>r.json()).then(updateDashboard).catch(err=>{console.error('Polling error',err); document.getElementById('lastChecked').textContent='Error loading data';});},300000);
+setInterval(()=>{fetch('restarts.json')
+  .then(r=>r.json())
+  .then(updateDashboard)
+  .catch(err=>{console.error('Polling error',err); document.getElementById('lastChecked').textContent='Error loading data';});},300000);
 </script>
 </body>
 </html>
