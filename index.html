@@ -47,68 +47,96 @@ h1 { color:#bb86fc; }
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-Date.prototype.getISOWeek = function() {
-  const d = new Date(this.getTime() + ((this.getUTCDay()||0)-1)*86400000);
-  const thursday = new Date(d.getTime() + (4-this.getUTCDay())*86400000);
-  return Math.ceil((thursday - new Date(thursday.getFullYear(),0,1).getTime())/86400000/7)+1;
-};
+function etFormat(dateStr) {
+  const options = { 
+    timeZone: 'America/New_York',
+    year: 'numeric', 
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  };
+  return new Date(dateStr).toLocaleString('en-US', options);
+}
+
+function etDateOnly(dateStr) {
+  const options = { 
+    timeZone: 'America/New_York',
+    year: 'numeric', 
+    month: '2-digit',
+    day: '2-digit'
+  };
+  return new Date(dateStr).toLocaleString('en-CA', options);
+}
 
 fetch('restarts.json')
   .then(r => r.json())
   .then(data => {
     const lastChecked = data.last_checked || 'Never';
-    document.getElementById('lastChecked').textContent = lastChecked;
+    document.getElementById('lastChecked').textContent = etFormat(lastChecked);
 
     const restarts = data.restarts || [];
     const totalRestarts = restarts.length;
     document.getElementById('totalRestarts').textContent = totalRestarts;
 
-    // Counters per day, week, month
+    // Counters per day, week, month (using Eastern Time)
     const dayCounts = {};
     const weekCounts = {};
     const monthCounts = {};
 
     const now = new Date();
-    const thisYear = now.getFullYear();
-    const thisMonth = now.getMonth();
+    const etNow = new Date(now.getTime() + (now.getTimezoneOffset() * 60000));
+    const etTodayStr = etDateOnly(now.toISOString());
+    const etThisWeek = new Date().toLocaleString('en-CA', { 
+      timeZone: 'America/New_York',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      week: 'numeric',
+      hour12: false
+    });
+    const etThisMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
 
     restarts.forEach(ts => {
-      const d = new Date(ts);
-      const dateStr = d.toISOString().split('T')[0]; // YYYY-MM-DD
-      dayCounts[dateStr] = (dayCounts[dateStr] || 0) + 1;
+      const etDate = etDateOnly(ts);
+      dayCounts[etDate] = (dayCounts[etDate] || 0) + 1;
 
-      const week = d.getISOWeek ? d.getISOWeek() : Math.ceil((Date.UTC(now.getFullYear(), d.getMonth(), d.getDate()) / 86400000 + 3) / 7);
-      weekCounts[week] = (weekCounts[week] || 0) + 1;
+      const etWeekKey = etThisWeek; // simplified weekly grouping by week start
+      weekCounts[etWeekKey] = (weekCounts[etWeekKey] || 0) + 1;
 
-      const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const monthKey = ts.substring(0, 7); // YYYY-MM
       monthCounts[monthKey] = (monthCounts[monthKey] || 0) + 1;
     });
 
-    // Today
-    const todayStr = new Date().toISOString().split('T')[0];
-    const todayCount = dayCounts[dayStr] || 0;
+    // Today counter
+    const todayStr = etDateOnly(now.toISOString());
+    const todayCount = dayCounts[todayStr] || 0;
     document.getElementById('todayRestarts').textContent = todayCount;
 
-    // This week
-    const weekCount = weekCounts[thisWeek] || 0;
+    // This week counter (using current week key)
+    const weekCount = weekCounts[etThisWeek] || 0;
     document.getElementById('weekRestarts').textContent = weekCount;
 
-    // This month
-    const monthCount = monthCounts[`${thisYear}-${String(thisMonth + 1).padStart(2, '0')}`] || 0;
+    // This month counter
+    const monthCount = monthCounts[etThisMonth] || 0;
     document.getElementById('monthRestarts').textContent = monthCount;
 
     // Prepare data for chart (daily counts sorted)
     const dates = Object.keys(dayCounts).sort();
-    const counts = dayCounts.map(d => dayCounts[d]);
+    const counts = dates.map(d => dayCounts[d]);
+
+    // Format labels to Eastern Time format (YYYY-MM-DD)
+    const etLabels = dates.map(d => etDateOnly(d));
 
     // Create line chart
     const ctx = document.getElementById('restartChart').getContext('2d');
     new Chart(ctx, {
       type: 'line',
       data: {
-        labels: dates,
+        labels: etLabels,
         datasets: [{
-          label: 'Restarts per Day',
+          label: 'Restarts per Day (ET)',
           data: counts,
           borderColor: '#3498db',
           backgroundColor: 'rgba(52,152,219,0.1)',
@@ -120,7 +148,7 @@ fetch('restarts.json')
         responsive: true,
         scales: {
           y: { beginAtZero: true },
-          x: { title: { display: true, text: 'Date' } },
+          x: { title: { display: true, text: 'Date (ET)' } },
           y: { title: { display: true, text: 'Count' } }
         },
         plugins: {
