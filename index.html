@@ -196,23 +196,18 @@ function updateDashboard(data) {
   window.restartChart = new Chart(restartCtx,{type:'line',data:{labels:restartLabels,datasets:[{label:'Restarts per Day (ET)',data:restartCounts,borderColor:'#3498db',backgroundColor:'rgba(52,152,219,0.1)',tension:0.1,fill:true}]},options:{responsive:true,scales:{y:{beginAtZero:true},x:{title:{display:true,text:'Date (ET)'}},y:{title:{display:true,text:'Count'}}},plugins:{legend:{display:true},tooltip:{mode:'index',intersect:false}}}});
 
   // Uptime accumulation chart
-  // Compute cumulative uptime (in hours) between restarts up to last_checked
-  const timestamps = restarts.slice().sort(); // ISO strings
+  const timestamps = restarts.slice().sort();
   const lastChecked = data.last_checked ? new Date(data.last_checked) : new Date();
   const points = [];
   let cumulativeMs = 0;
-  let prev = timestamps.length ? new Date(timestamps[0]) : lastChecked; // start from first restart or now
-  // If there are restarts, assume system was down at each restart moment, uptime starts after that moment
+  let prev = timestamps.length ? new Date(timestamps[0]) : lastChecked;
   timestamps.forEach(ts=>{
     const cur = new Date(ts);
-    // uptime from prev (after previous restart) to this restart
-    const diff = cur - prev; // ms
+    const diff = cur - prev;
     if(diff>0) cumulativeMs += diff;
     points.push({time: cur, uptimeHours: cumulativeMs/3600000});
-    // after restart, reset uptime counter (system down), set prev to cur (restart moment)
     prev = cur;
   });
-  // Add final segment up to lastChecked
   const finalDiff = lastChecked - prev;
   if(finalDiff>0) cumulativeMs += finalDiff;
   points.push({time: lastChecked, uptimeHours: cumulativeMs/3600000});
