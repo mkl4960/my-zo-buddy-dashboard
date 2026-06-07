@@ -1,39 +1,139 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Zo-Computer Restart Dashboard</title>
-    <style>
-        body { font-family: Arial, sans-serif; padding: 20px; }
-        .stats { background: #f0f0f0; padding: 10px; border-radius: 5px; margin: 10px 0; }
-        .last-checked { color: #2c3e50; font-weight: bold; }
-    </style>
+<meta charset="UTF-8">
+<title>Zo-Computer Restart Dashboard</title>
+<style>
+body { background:#121212; color:#e0e0e0; font-family:Arial, sans-serif; padding:20px; }
+.stats { background:#1e1e1e; padding:15px; border-radius:8px; margin:15px 0; }
+h1 { color:#bb86fc; }
+.last-checked { font-weight:bold; }
+.counters { display:flex; justify-content:space-between; margin:15px 0; }
+.counter { text-align:center; }
+.counter h3 { margin:0; font-size:1.2em; }
+.counter p { margin:5px 0 0; font-size:0.9em; }
+.chart-container { max-width:800px; margin:30px auto; }
+</style>
 </head>
 <body>
-    <h1>Zo-Computer Restart Dashboard</h1>
-    <div class="stats">
-        <p><strong>Last Checked:</strong> <span id="lastChecked">Loading...</span></p>
-        <h2>Restart Events</h2>
-        <ul id="restartsList"></ul>
+<h1>Zo-Computer Restart Dashboard</h1>
+<div class="stats">
+  <p><strong>Last Checked:</strong> <span id="lastChecked">Loading...</span></p>
+  <div class="counters">
+    <div class="counter">
+      <h3>Total Restarts</h3>
+      <p id="totalRestarts">0</p>
     </div>
-    <script>
-        // Load restarts.json and update dashboard
-        fetch('restarts.json')
-            .then(response => response.json())
-            .then(data => {
-                // Update last checked timestamp
-                document.getElementById('lastChecked').textContent = data.last_checked || 'Never';
-                // Display restart events
-                const list = document.getElementById('restartsList');
-                (data.restarts || []).forEach(ts => {
-                    const li = document.createElement('li');
-                    li.textContent = new Date(ts).toLocaleString();
-                    list.appendChild(li);
-                });
-            })
-            .catch(err => {
-                document.getElementById('lastChecked').textContent = 'Error loading data';
-                console.error(err);
-            });
-    </script>
+    <div class="counter">
+      <h3>Today</h3>
+      <p id="todayRestarts">0</p>
+    </div>
+    <div class="counter">
+      <h3>This Week</h3>
+      <p id="weekRestarts">0</p>
+    </div>
+    <div class="counter">
+      <h3>This Month</h3>
+      <p id="monthRestarts">0</p>
+    </div>
+  </div>
+  <h2>Restart Events</h2>
+  <ul id="restartsList"></ul>
+</div>
+
+<div class="chart-container">
+  <canvas id="restartChart"></canvas>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+Date.prototype.getISOWeek = function() {
+  const d = new Date(this.getTime() + ((this.getUTCDay()||0)-1)*86400000);
+  const thursday = new Date(d.getTime() + (4-this.getUTCDay())*86400000);
+  return Math.ceil((thursday - new Date(thursday.getFullYear(),0,1).getTime())/86400000/7)+1;
+};
+
+fetch('restarts.json')
+  .then(r => r.json())
+  .then(data => {
+    const lastChecked = data.last_checked || 'Never';
+    document.getElementById('lastChecked').textContent = lastChecked;
+
+    const restarts = data.restarts || [];
+    const totalRestarts = restarts.length;
+    document.getElementById('totalRestarts').textContent = totalRestarts;
+
+    // Counters per day, week, month
+    const dayCounts = {};
+    const weekCounts = {};
+    const monthCounts = {};
+
+    const now = new Date();
+    const thisYear = now.getFullYear();
+    const thisMonth = now.getMonth();
+
+    restarts.forEach(ts => {
+      const d = new Date(ts);
+      const dateStr = d.toISOString().split('T')[0]; // YYYY-MM-DD
+      dayCounts[dateStr] = (dayCounts[dateStr] || 0) + 1;
+
+      const week = d.getISOWeek ? d.getISOWeek() : Math.ceil((Date.UTC(now.getFullYear(), d.getMonth(), d.getDate()) / 86400000 + 3) / 7);
+      weekCounts[week] = (weekCounts[week] || 0) + 1;
+
+      const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      monthCounts[monthKey] = (monthCounts[monthKey] || 0) + 1;
+    });
+
+    // Today
+    const todayStr = new Date().toISOString().split('T')[0];
+    const todayCount = dayCounts[dayStr] || 0;
+    document.getElementById('todayRestarts').textContent = todayCount;
+
+    // This week
+    const weekCount = weekCounts[thisWeek] || 0;
+    document.getElementById('weekRestarts').textContent = weekCount;
+
+    // This month
+    const monthCount = monthCounts[`${thisYear}-${String(thisMonth + 1).padStart(2, '0')}`] || 0;
+    document.getElementById('monthRestarts').textContent = monthCount;
+
+    // Prepare data for chart (daily counts sorted)
+    const dates = Object.keys(dayCounts).sort();
+    const counts = dayCounts.map(d => dayCounts[d]);
+
+    // Create line chart
+    const ctx = document.getElementById('restartChart').getContext('2d');
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: dates,
+        datasets: [{
+          label: 'Restarts per Day',
+          data: counts,
+          borderColor: '#3498db',
+          backgroundColor: 'rgba(52,152,219,0.1)',
+          tension: 0.1,
+          fill: true,
+        }]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          y: { beginAtZero: true },
+          x: { title: { display: true, text: 'Date' } },
+          y: { title: { display: true, text: 'Count' } }
+        },
+        plugins: {
+          legend: { display: true },
+          tooltip: { mode: 'index', intersect: false }
+        }
+      }
+    });
+  })
+  .catch(err => {
+    document.getElementById('lastChecked').textContent = 'Error loading data';
+    console.error(err);
+  });
+</script>
 </body>
 </html>
